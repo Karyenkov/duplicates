@@ -33,7 +33,6 @@ const UNIVERSAL_PROFILE = {
     { key: "weightG", regex: /(?:^|[^\d])(\d{2,5})\s*g\b/gi }
   ]
 };
-=======
 
 const state = {
   inputRows: [],
@@ -114,6 +113,20 @@ function extractNumericValues(regex, input) {
   return out;
 }
 
+function extractDimensionPairs(input) {
+  const out = new Set();
+  const regex = /(?:^|[^\d])(\d{2,3})\s*[xх×]\s*(\d{2,3})(?:\s*(?:см|cm))?/gi;
+  let m;
+  while ((m = regex.exec(input)) !== null) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    const [minD, maxD] = a <= b ? [a, b] : [b, a];
+    out.add(`${minD}x${maxD}`);
+  }
+  return out;
+}
+
 function detectColors(raw) {
   const s = String(raw || "").toLowerCase();
   const found = new Set();
@@ -139,6 +152,7 @@ function parseTitleAttributes(title) {
     capacitiesGb: extractNumericValues(/(?:^|[^\d])(\d{1,4})\s*gb\b/gi, lower),
     capacitiesTb: extractNumericValues(/(?:^|[^\d])(\d{1,3})\s*tb\b/gi, lower),
     weightsGram: extractNumericValues(/(?:^|[^\d])(\d{2,5})\s*(?:g|гр|gram|grams)\b/gi, lower),
+    dimensionsCm: extractDimensionPairs(lower),
     sizesInch: extractNumericValues(/(?:^|[^\d])(\d{1,2}(?:\.\d{1,2})?)\s*(?:\"|inch|in|дюйм)/gi, lower),
     multipliers: extractNumericValues(/\b(\d{1,2})\s*x\s*\d{1,4}\s*gb\b/gi, lower),
     normTitle: normalized
@@ -170,6 +184,7 @@ function hasHardConflict(a, b) {
   if (setsConflict(a.capacitiesGb, b.capacitiesGb)) return true;
   if (setsConflict(a.capacitiesTb, b.capacitiesTb)) return true;
   if (setsConflict(a.weightsGram, b.weightsGram)) return true;
+  if (setsConflict(a.dimensionsCm, b.dimensionsCm)) return true;
   if (setsConflict(a.sizesInch, b.sizesInch)) return true;
   if (setsConflict(a.multipliers, b.multipliers)) return true;
 
@@ -262,7 +277,6 @@ function buildGroups(rows, cfg) {
       _brand: normText(r["Бренд"]),
       _title: normText(r["Назва"]),
       _attrs: parseTitleAttributes(r["Назва"]),
-=======
       _vendor: normVendor(r["Вендор код"]),
       _barcode: normBarcode(r["Штрихкод"]),
       _titleVendorCodes: titleVendorCodes,
@@ -283,7 +297,6 @@ function buildGroups(rows, cfg) {
       return;
     }
 
-=======
   const edges = new Map();
   const addEdge = (u1, u2, score, reason) => {
     if (u1 === u2) return;
@@ -354,7 +367,6 @@ function buildGroups(rows, cfg) {
   const dsu = new DSU();
   for (const { a, b } of edges.values()) dsu.union(a, b);
 
-=======
   const byUuid = new Map(data.map((r) => [r._uuid, r]));
   const comps = new Map();
   for (const row of data) {
