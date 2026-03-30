@@ -226,6 +226,7 @@ function ensureColumns(rows) {
     "Name": "Назва",
     "Product name": "Назва",
     "Title": "Назва",
+    "Variation_name": "Назва",
     "EAN": "Штрихкод",
     "Barcode": "Штрихкод",
     "Vendor code": "Вендор код",
