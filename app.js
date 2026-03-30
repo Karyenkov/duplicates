@@ -69,7 +69,10 @@ function normText(value) {
 
 function normVendor(value) {
   if (value == null) return "";
-  return String(value).trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return String(value)
+    .trim()
+    .toUpperCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 function normBarcode(value) {
