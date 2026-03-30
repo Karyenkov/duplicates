@@ -287,6 +287,8 @@ function buildGroups(rows, cfg) {
       _titleBarcodes: titleBarcodes
     };
   });
+  // DEBUG: log first 5 normalized titles to console
+  console.log("[dedupe] first 5 _title values:", data.slice(0, 5).map(r => JSON.stringify(r._title)));
 
   const byUuid = new Map(data.map((r) => [r._uuid, r]));
 
@@ -296,7 +298,10 @@ function buildGroups(rows, cfg) {
     const left = byUuid.get(u1);
     const right = byUuid.get(u2);
     if (!left || !right) return;
-    if (hasHardConflict(left._attrs, right._attrs)) return;
+    // For near-identical titles (score >= 0.95) skip hard-conflict check —
+    // noisy numeric regexes can produce false conflicts on identical product names.
+    const titleSimilarity = tokenSetRatio(left._title, right._title);
+    if (titleSimilarity < 0.95 && hasHardConflict(left._attrs, right._attrs)) return;
     if ((reason === "exact_vendor_code" || reason === "exact_barcode") && !titlesLookCompatible(left._attrs, right._attrs)) {
       return;
     }
@@ -361,6 +366,30 @@ function buildGroups(rows, cfg) {
     }
   }
 
+  // Cross-block fallback: compare all pairs whose titles share the first 8 normalized chars.
+  // Catches cases where noise removal shifts the 18-char block boundary.
+  const shortBlocks = new Map();
+  for (const row of data) {
+    if (!row._title) continue;
+    const block = row._title.slice(0, 8);
+    if (!shortBlocks.has(block)) shortBlocks.set(block, []);
+    shortBlocks.get(block).push(row);
+  }
+  for (const group of shortBlocks.values()) {
+    if (group.length < 2 || group.length > cfg.fuzzyBlockMax) continue;
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const a = group[i];
+        const b = group[j];
+        const titleScore = tokenSetRatio(a._title, b._title);
+        if (titleScore >= 0.95) {
+          const bonus = a._brand && a._brand === b._brand ? 0.03 : 0;
+          addEdge(a._uuid, b._uuid, Math.min(1, titleScore + bonus), "title_almost_exact");
+        }
+      }
+    }
+  }
+
   if (cfg.includeFuzzy) {
     const fuzzyRows = data.filter((r) => r._title);
     const blocks = new Map();
@@ -377,8 +406,9 @@ function buildGroups(rows, cfg) {
           const a = group[i];
           const b = group[j];
           if (!a._title || !b._title) continue;
-          if (hasHardConflict(a._attrs, b._attrs)) continue;
           const titleScore = tokenSetRatio(a._title, b._title);
+          if (titleScore < cfg.threshold) continue;
+          if (titleScore < 0.95 && hasHardConflict(a._attrs, b._attrs)) continue;
           if (titleScore < cfg.threshold) continue;
           const bonus = a._brand && a._brand === b._brand ? 0.03 : 0;
           const score = Math.min(1, titleScore + bonus);
