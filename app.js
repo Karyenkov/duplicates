@@ -83,6 +83,7 @@ function extractCodesFromTitle(title) {
   const raw = t.match(/\b[A-Z0-9][A-Z0-9\-_/\.]{3,}[A-Z0-9]\b/g) || [];
   const tokens = t.match(/[A-Z0-9]+/g) || [];
   const joined = [];
+
   for (let i = 0; i < tokens.length - 1; i++) {
     const comb = tokens[i] + tokens[i + 1];
     if (comb.length >= 5 && comb.length <= 20 && /[A-Z]/.test(comb) && /\d/.test(comb)) {
@@ -93,8 +94,11 @@ function extractCodesFromTitle(title) {
   const vendorCodes = [];
   for (const c of [...raw, ...joined]) {
     const nv = normVendor(c);
-    if (nv.length >= 5 && /[A-Z]/.test(nv) && /\d/.test(nv)) vendorCodes.push(nv);
+    if (nv.length >= 5 && /[A-Z]/.test(nv) && /\d/.test(nv)) {
+      vendorCodes.push(nv);
+    }
   }
+
   return [[...new Set(vendorCodes)], barcodes];
 }
 
@@ -102,6 +106,7 @@ function extractBracketVendorCodes(title) {
   const s = String(title || "");
   const out = new Set();
   const matches = s.match(/\(([^)]+)\)/g) || [];
+
   for (const m of matches) {
     const inner = m.slice(1, -1).trim();
     const nv = normVendor(inner);
@@ -109,6 +114,7 @@ function extractBracketVendorCodes(title) {
       out.add(nv);
     }
   }
+
   return out;
 }
 
