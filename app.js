@@ -221,26 +221,23 @@ function titlesLookCompatible(a, b) {
 }
 
 function ensureColumns(rows) {
-  const alias = {
-    "Название": "Назва",
-    "Name": "Назва",
-    "Product name": "Назва",
-    "Title": "Назва",
-    "Variation_name": "Назва",
-    "EAN": "Штрихкод",
-    "Barcode": "Штрихкод",
-    "Vendor code": "Вендор код",
-    "Vendor": "Вендор код",
-    "Brand": "Бренд",
-    "Variation": "Variation_name"
-  };
-
   return rows.map((row, idx) => {
     const r = { ...row };
-    for (const [a, b] of Object.entries(alias)) {
-      if (r[a] != null && (r[b] == null || r[b] === "")) r[b] = r[a];
+
+    const normalized = {
+      "[uuid]": getByHeader(r, ["[uuid]", "uuid"]),
+      "SKU": getByHeader(r, ["SKU"]),
+      "Штрихкод": getByHeader(r, ["Штрихкод", "EAN", "Barcode"]),
+      "Бренд": getByHeader(r, ["Бренд", "Brand"]),
+      "Variation_name": getByHeader(r, ["Variation_name", "Variation", "variation_name"]),
+      "Вендор код": getByHeader(r, ["Вендор код", "Vendor code", "Vendor"]),
+      "Назва": getByHeader(r, ["Назва", "Название", "Name", "Product name", "Title", "Variation_name", "Variation"])
+    };
+
+    for (const c of CORE_COLS) {
+      r[c] = normalized[c] ?? "";
     }
-    for (const c of CORE_COLS) if (r[c] == null) r[c] = "";
+
     if (!r["[uuid]"]) r["[uuid]"] = `row-${idx + 1}`;
     return r;
   });
@@ -290,6 +287,8 @@ function buildGroups(rows, cfg) {
   });
   // DEBUG: log first 5 normalized titles to console
   console.log("[dedupe] first 5 _title values:", data.slice(0, 5).map(r => JSON.stringify(r._title)));
+  console.log("[headers]", Object.keys(rows[0] || {}));
+  console.log("[first row raw]", rows[0]);
 
   const byUuid = new Map(data.map((r) => [r._uuid, r]));
 
@@ -492,6 +491,9 @@ async function onLoadFile(event) {
 
   try {
     const rows = await parseFile(file);
+    console.log("[headers]", Object.keys(rows[0] || {}));
+    console.log("[first row raw]", rows[0]);
+
     state.inputRows = ensureColumns(rows);
     state.resultRows = [];
     exportBtn.disabled = true;
@@ -551,6 +553,27 @@ function onRun() {
       runBtn.disabled = false;
     }
   }, 0);
+}
+
+function normalizeHeaderName(name) {
+  return String(name || "")
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function getByHeader(row, candidates) {
+  const entries = Object.entries(row || {});
+  for (const candidate of candidates) {
+    const wanted = normalizeHeaderName(candidate);
+    for (const [key, value] of entries) {
+      if (normalizeHeaderName(key) === wanted) {
+        return value;
+      }
+    }
+  }
+  return "";
 }
 
 function renderTable(rows) {
